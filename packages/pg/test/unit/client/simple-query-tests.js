@@ -1,11 +1,14 @@
 'use strict'
-var helper = require('./test-helper')
-var Query = require('../../../lib/query')
+const helper = require('./test-helper')
+const Query = require('../../../lib/query')
+const assert = require('assert')
+const suite = new helper.Suite()
+const test = suite.test.bind(suite)
 
 test('executing query', function () {
   test('queing query', function () {
     test('when connection is ready', function () {
-      var client = helper.client()
+      const client = helper.client()
       assert.empty(client.connection.queries)
       client.connection.emit('readyForQuery')
       client.query('yes')
@@ -14,7 +17,7 @@ test('executing query', function () {
     })
 
     test('when connection is not ready', function () {
-      var client = helper.client()
+      const client = helper.client()
 
       test('query is not sent', function () {
         client.query('boom')
@@ -29,9 +32,9 @@ test('executing query', function () {
     })
 
     test('multiple in the queue', function () {
-      var client = helper.client()
-      var connection = client.connection
-      var queries = connection.queries
+      const client = helper.client()
+      const connection = client.connection
+      const queries = connection.queries
       client.query('one')
       client.query('two')
       client.query('three')
@@ -61,9 +64,9 @@ test('executing query', function () {
   })
 
   test('query event binding and flow', function () {
-    var client = helper.client()
-    var con = client.connection
-    var query = client.query(new Query('whatever'))
+    const client = helper.client()
+    const con = client.connection
+    const query = client.query(new Query('whatever'))
 
     test('has no queries sent before ready', function () {
       assert.empty(con.queries)
@@ -76,7 +79,7 @@ test('executing query', function () {
     })
 
     test('handles rowDescription message', function () {
-      var handled = con.emit('rowDescription', {
+      const handled = con.emit('rowDescription', {
         fields: [
           {
             name: 'boom',
@@ -91,14 +94,14 @@ test('executing query', function () {
         assert.equal(row['boom'], 'hi')
       })
 
-      var handled = con.emit('dataRow', { fields: ['hi'] })
+      const handled = con.emit('dataRow', { fields: ['hi'] })
       assert.ok(handled, 'should have handled first data row message')
 
       assert.emits(query, 'row', function (row) {
         assert.equal(row['boom'], 'bye')
       })
 
-      var handledAgain = con.emit('dataRow', { fields: ['bye'] })
+      const handledAgain = con.emit('dataRow', { fields: ['bye'] })
       assert.ok(handledAgain, 'should have handled seciond data row message')
     })
 
@@ -109,45 +112,150 @@ test('executing query', function () {
         text: 'INSERT 31 1',
       })
     })
+  })
 
-    test('removes itself after another readyForQuery message', function () {
-      return false
-      assert.emits(query, 'end', function (msg) {
-        // TODO do we want to check the complete messages?
-      })
+  test('pipeline', function () {
+    test('sends all queries immediately after readyForQuery', function () {
+      const client = helper.client({ pipeline: true })
+      client.connection.emit('readyForQuery')
+      client.query('one')
+      client.query('two')
+      client.query('three')
+      assert.lengthIs(client.connection.queries, 3)
+      assert.equal(client.connection.queries[0], 'one')
+      assert.equal(client.connection.queries[1], 'two')
+      assert.equal(client.connection.queries[2], 'three')
+    })
+
+    test('completes queries in order', function (done) {
+      const client = helper.client({ pipeline: true })
+      const con = client.connection
       con.emit('readyForQuery')
-      // this would never actually happen
-      ;['dataRow', 'rowDescription', 'commandComplete'].forEach(function (msg) {
-        assert.equal(con.emit(msg), false, "Should no longer be picking up '" + msg + "' messages")
+
+      const results = []
+      client.query('one', (err, res) => {
+        results.push('one')
       })
+      client.query('two', (err, res) => {
+        results.push('two')
+      })
+      client.query('three', (err, res) => {
+        results.push('three')
+      })
+
+      // simulate server responding to each query in order
+      con.emit('readyForQuery')
+      con.emit('readyForQuery')
+      con.emit('readyForQuery')
+
+      process.nextTick(() => {
+        assert.deepStrictEqual(results, ['one', 'two', 'three'])
+        done()
+      })
+    })
+
+    test('emits drain after all queries complete', function (done) {
+      const client = helper.client({ pipeline: true })
+      const con = client.connection
+      con.emit('readyForQuery')
+
+      client.query('one')
+      client.query('two')
+
+      client.on('drain', () => {
+        done()
+      })
+
+      con.emit('readyForQuery')
+      con.emit('readyForQuery')
+    })
+
+    test('extended protocol: sends parse/bind/sync for each pipelined parameterized query', function () {
+      const client = helper.client({ pipeline: true })
+      const con = client.connection
+      con.emit('readyForQuery')
+
+      client.query({ text: 'SELECT $1::int', values: [1] })
+      client.query({ text: 'SELECT $1::int', values: [2] })
+
+      // both parse messages should have been sent immediately
+      assert.lengthIs(con.parseMessages, 2)
+      assert.equal(con.parseMessages[0].text, 'SELECT $1::int')
+      assert.equal(con.parseMessages[1].text, 'SELECT $1::int')
+      // both bind messages too
+      assert.lengthIs(con.bindMessages, 2)
+      // each query sends its own sync
+      assert.equal(con.syncCount, 2)
+    })
+
+    test('named statement: parse sent only once when pipelining the same name', function () {
+      const client = helper.client({ pipeline: true })
+      const con = client.connection
+      con.emit('readyForQuery')
+
+      client.query({ name: 'my-stmt', text: 'SELECT $1::int', values: [1] })
+      client.query({ name: 'my-stmt', text: 'SELECT $1::int', values: [2] })
+
+      // parse sent only once — second query reuses the submitted statement
+      assert.lengthIs(con.parseMessages, 1)
+      // both bind messages sent
+      assert.lengthIs(con.bindMessages, 2)
+    })
+
+    test('pipeline disabled by default', function () {
+      const client = helper.client()
+      assert.equal(client.pipeline, false)
     })
   })
 
   test('handles errors', function () {
-    var client = helper.client()
+    const client = helper.client()
 
     test('throws an error when config is null', function () {
-      try {
-        client.query(null, undefined)
-      } catch (error) {
-        assert.equal(
-          error.message,
-          'Client was passed a null or undefined query',
-          'Should have thrown an Error for null queries'
-        )
-      }
+      assert.throws(
+        () => {
+          client.query(null, undefined)
+        },
+        {
+          message: 'Client was passed a null or undefined query',
+        }
+      )
     })
 
     test('throws an error when config is undefined', function () {
-      try {
-        client.query()
-      } catch (error) {
-        assert.equal(
-          error.message,
-          'Client was passed a null or undefined query',
-          'Should have thrown an Error for null queries'
-        )
-      }
+      assert.throws(
+        () => {
+          client.query()
+        },
+        {
+          message: 'Client was passed a null or undefined query',
+        }
+      )
+    })
+
+    test('throws an error when callback is not a function', function () {
+      assert.throws(
+        () => {
+          client.query('SELECT $1', [1], 'notafunction')
+        },
+        {
+          message: 'callback is not a function',
+        }
+      )
+    })
+  })
+
+  test('reusing a config object across calls', function () {
+    // Regression test for https://github.com/brianc/node-postgres/issues/2651.
+    test('does not leak callback state into a later promise-style call', function () {
+      const client = helper.client()
+      const config = { text: 'SELECT $1', values: [1] }
+
+      client.query(config, function () {})
+      const result = client.query(config)
+
+      assert.ok(result instanceof Promise, 'expected client.query() to return a Promise')
+      result.catch(() => {})
     })
   })
 })

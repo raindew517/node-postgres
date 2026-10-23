@@ -16,11 +16,11 @@ describe('close', function () {
   it('can close a finished cursor without a callback', function (done) {
     const cursor = new Cursor(text)
     this.client.query(cursor)
-    this.client.query('SELECT NOW()', done)
     cursor.read(100, function (err) {
       assert.ifError(err)
       cursor.close()
     })
+    this.client.once('drain', done)
   })
 
   it('can close a finished cursor a promise', function (done) {
@@ -37,11 +37,11 @@ describe('close', function () {
   it('closes cursor early', function (done) {
     const cursor = new Cursor(text)
     this.client.query(cursor)
-    this.client.query('SELECT NOW()', done)
     cursor.read(25, function (err) {
       assert.ifError(err)
       cursor.close()
     })
+    this.client.once('drain', done)
   })
 
   it('works with callback style', function (done) {
@@ -61,5 +61,37 @@ describe('close', function () {
   it('is a no-op to "close" the cursor before submitting it', function (done) {
     const cursor = new Cursor(text)
     cursor.close(done)
+  })
+
+  it('keeps the client usable after closing before the first response', async function () {
+    // Let the connect callback return before submitting the cursor.
+    await Promise.resolve()
+    const client = this.client
+    const cursor = new Cursor(text)
+    const connection = client.connection
+    const sync = connection.sync
+    let syncCount = 0
+    connection.sync = function () {
+      syncCount++
+      return sync.apply(this, arguments)
+    }
+
+    connection.stream.pause()
+    try {
+      client.query(cursor)
+      assert.strictEqual(cursor.connection, connection)
+      // Exhaust the portal so CommandComplete arrives after close.
+      const read = cursor.read(100)
+      const closed = cursor.close()
+      connection.stream.resume()
+
+      await Promise.all([read, closed])
+      assert.strictEqual(syncCount, 1)
+      const result = await client.query('SELECT 1 AS value')
+      assert.deepStrictEqual(result.rows, [{ value: 1 }])
+    } finally {
+      connection.stream.resume()
+      connection.sync = sync
+    }
   })
 })

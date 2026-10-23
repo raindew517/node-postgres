@@ -1,4 +1,5 @@
 'use strict'
+// note: can remove these deep requires when we bump min version of pg to 9.x
 const Result = require('pg/lib/result.js')
 const prepare = require('pg/lib/utils.js').prepareValue
 const EventEmitter = require('events').EventEmitter
@@ -26,8 +27,10 @@ class Cursor extends EventEmitter {
   }
 
   _ifNoData() {
-    this.state = 'idle'
-    this._shiftQueue()
+    if (this.state !== 'done' && this.state !== 'error') {
+      this.state = 'idle'
+      this._shiftQueue()
+    }
     if (this.connection) {
       this.connection.removeListener('rowDescription', this._rowDescription)
     }
@@ -86,6 +89,8 @@ class Cursor extends EventEmitter {
   }
 
   _closePortal() {
+    if (this.state === 'done') return
+
     // because we opened a named portal to stream results
     // we need to close the same named portal.  Leaving a named portal
     // open can lock tables for modification if inside a transaction.
@@ -97,12 +102,16 @@ class Cursor extends EventEmitter {
     if (this.state !== 'error') {
       this.connection.sync()
     }
+
+    this.state = 'done'
   }
 
   handleRowDescription(msg) {
     this._result.addFields(msg.fields)
-    this.state = 'idle'
-    this._shiftQueue()
+    if (this.state !== 'done' && this.state !== 'error') {
+      this.state = 'idle'
+      this._shiftQueue()
+    }
   }
 
   handleDataRow(msg) {
@@ -112,7 +121,9 @@ class Cursor extends EventEmitter {
   }
 
   _sendRows() {
-    this.state = 'idle'
+    if (this.state !== 'done') {
+      this.state = 'idle'
+    }
     setImmediate(() => {
       const cb = this._cb
       // remove callback before calling it
@@ -147,6 +158,9 @@ class Cursor extends EventEmitter {
   }
 
   handleError(msg) {
+    // If this cursor has already closed, don't try to handle the error.
+    if (this.state === 'done') return
+
     // If we're in an initialized state we've never been submitted
     // and don't have a connection instance reference yet.
     // This can happen if you queue a stream and close the client before
@@ -167,8 +181,10 @@ class Cursor extends EventEmitter {
     }
     // dispatch error to all waiting callbacks
     for (let i = 0; i < this._queue.length; i++) {
-      this._queue.pop()[1](msg)
+      const queuedCallback = this._queue[i][1]
+      queuedCallback.call(this, msg)
     }
+    this._queue.length = 0
 
     if (this.listenerCount('error') > 0) {
       // only dispatch error events if we have a listener
@@ -213,7 +229,6 @@ class Cursor extends EventEmitter {
     }
 
     this._closePortal()
-    this.state = 'done'
     this.connection.once('readyForQuery', function () {
       cb()
     })

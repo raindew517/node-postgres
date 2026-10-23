@@ -37,6 +37,18 @@ describe('pool error handling', function () {
     })
   })
 
+  it('Catches errors in client.query', async function () {
+    let caught = false
+    const pool = new Pool()
+    try {
+      await pool.query(null)
+    } catch (e) {
+      caught = true
+    }
+    pool.end()
+    expect(caught).to.be(true)
+  })
+
   describe('calling release more than once', () => {
     it(
       'should throw each time',
@@ -186,7 +198,7 @@ describe('pool error handling', function () {
       co.wrap(function* () {
         const pool = new Pool({ max: 1 })
         const errors = []
-        for (var i = 0; i < 20; i++) {
+        for (let i = 0; i < 20; i++) {
           try {
             yield pool.query('invalid sql')
           } catch (err) {

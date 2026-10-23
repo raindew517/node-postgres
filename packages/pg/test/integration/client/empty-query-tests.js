@@ -1,6 +1,7 @@
 'use strict'
-var helper = require('./test-helper')
+const helper = require('./test-helper')
 const suite = new helper.Suite()
+const assert = require('assert')
 
 suite.test('empty query message handling', function (done) {
   const client = helper.client()
@@ -17,4 +18,16 @@ suite.test('callback supported', function (done) {
     assert.empty(result.rows)
     client.end(done)
   })
+})
+
+suite.test('a named empty statement can run more than once', async function () {
+  const client = helper.client()
+  try {
+    for (let i = 0; i < 2; i++) {
+      const result = await client.query({ text: '', name: 'empty' })
+      assert.empty(result.rows)
+    }
+  } finally {
+    await client.end()
+  }
 })

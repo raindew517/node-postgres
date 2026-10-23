@@ -1,12 +1,8 @@
 'use strict'
-var bluebird = require('bluebird')
-var helper = require('../test-helper')
-var pg = helper.pg
-
-process.on('unhandledRejection', function (e) {
-  console.error(e, e.stack)
-  process.exit(1)
-})
+const bluebird = require('bluebird')
+const helper = require('../test-helper')
+const pg = helper.pg
+const assert = require('assert')
 
 const suite = new helper.Suite()
 

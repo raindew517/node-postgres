@@ -4,6 +4,80 @@ For richer information consult the commit log on github with referenced pull req
 
 We do not include break-fix version release in this file.
 
+## pg@8.23.0
+
+- Add support for query [`pipelineing`](https://github.com/brianc/node-postgres/pull/3652).
+
+## pg@8.22.0
+
+- Add support for [sslnegotiation=direct](https://github.com/brianc/node-postgres/pull/3688) for PostgreSQL 17+.
+
+## pg@8.21.0
+
+- Handle [SASL SCRAM](https://github.com/brianc/node-postgres/pull/3521) server error responses properly.
+- Add support for [node@26](https://github.com/brianc/node-postgres/pull/3667).
+- Add `scramMaxIterations` [config option](https://github.com/brianc/node-postgres/pull/3677).
+- Add `client.getTransactionStatus()` [method](https://github.com/brianc/node-postgres/pull/3645).
+
+## pg@8.20.0
+
+- Add [onConnect](https://github.com/brianc/node-postgres/pull/3620) callback to pg.Pool constructor options allowing for async initialization of newly created & connected pooled clients.
+
+## pg@8.19.0
+
+- [Deprecate interal query queue](https://github.com/brianc/node-postgres/pull/3603).
+- Pass connection parameters [to password callback](https://github.com/brianc/node-postgres/pull/3602).
+
+## pg@8.18.0
+
+- [Return the client instance](https://github.com/brianc/node-postgres/pull/3564) as the result of calling `connect` (previously it was `void`).
+
+## pg@8.17.0
+
+- Throw correct error if database URL parsing [fails](https://github.com/brianc/node-postgres/issues/3513).
+
+## pg@8.16.0
+
+- Add support for [min connection pool size](https://github.com/brianc/node-postgres/pull/3438).
+
+## pg@8.15.0
+
+- Add support for [esm](https://github.com/brianc/node-postgres/pull/3423) importing. CommonJS importing is still also supported.
+
+## pg@8.14.0
+
+- Add support for SCRAM-SHA-256-PLUS, i.e. [channel binding](https://github.com/brianc/node-postgres/pull/3356).
+
+## pg@8.13.0
+
+- Add ability to specify query timeout on [per-query basis](https://github.com/brianc/node-postgres/pull/3074).
+
+## pg@8.12.0
+
+- Add `queryMode` config option to [force use of the extended query protocol](https://github.com/brianc/node-postgres/pull/3214) on queries without any parameters.
+
+## pg-pool@8.10.0
+
+- Emit `release` event when client is returned to [the pool](https://github.com/brianc/node-postgres/pull/2845).
+
+## pg@8.9.0
+
+- Add support for [stream factory](https://github.com/brianc/node-postgres/pull/2898).
+- [Better errors](https://github.com/brianc/node-postgres/pull/2901) for SASL authentication.
+- [Use native crypto module](https://github.com/brianc/node-postgres/pull/2815) for SASL authentication.
+
+## pg@8.8.0
+
+- Bump minimum required version of [native bindings](https://github.com/brianc/node-postgres/pull/2787).
+- Catch previously uncatchable errors thrown in [`pool.query`](https://github.com/brianc/node-postgres/pull/2569).
+- Prevent the pool from blocking the event loop if all clients are [idle](https://github.com/brianc/node-postgres/pull/2721) (and `allowExitOnIdle` is enabled).
+- Support `lock_timeout` in [client config](https://github.com/brianc/node-postgres/pull/2779).
+- Fix errors thrown in callbacks from [interfering with cleanup](https://github.com/brianc/node-postgres/pull/2753).
+
+### pg-pool@3.5.0
+
+- Add connection [lifetime limit](https://github.com/brianc/node-postgres/pull/2698) config option.
+
 ### pg@8.7.0
 
 - Add optional config to [pool](https://github.com/brianc/node-postgres/pull/2568) to allow process to exit if pool is idle.
@@ -42,7 +116,7 @@ We do not include break-fix version release in this file.
 
 ### pg@8.2.0
 
-- Switch internal protocol parser & serializer to [pg-protocol](https://github.com/brianc/node-postgres/tree/master/packages/pg-protocol). The change is backwards compatible but results in a significant performance improvement across the board, with some queries as much as 50% faster. This is the first work to land in an on-going performance improvment initiative I'm working on. Stay tuned as things are set to get much faster still! :rocket:
+- Switch internal protocol parser & serializer to [pg-protocol](https://github.com/brianc/node-postgres/tree/master/packages/pg-protocol). The change is backwards compatible but results in a significant performance improvement across the board, with some queries as much as 50% faster. This is the first work to land in an on-going performance improvement initiative I'm working on. Stay tuned as things are set to get much faster still! :rocket:
 
 ### pg-cursor@2.2.0
 

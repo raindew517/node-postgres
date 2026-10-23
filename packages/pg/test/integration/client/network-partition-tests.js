@@ -1,21 +1,21 @@
 'use strict'
-var buffers = require('../../test-buffers')
-var helper = require('./test-helper')
-var suite = new helper.Suite()
+const buffers = require('../../test-buffers')
+const helper = require('./test-helper')
+const suite = new helper.Suite()
+const assert = require('assert')
 
-var net = require('net')
+const net = require('net')
 
-var Server = function (response) {
+const Server = function (response) {
   this.server = undefined
   this.socket = undefined
   this.response = response
 }
 
-let port = 54321
 Server.prototype.start = function (cb) {
   // this is our fake postgres server
-  // it responds with our specified response immediatley after receiving every buffer
-  // this is sufficient into convincing the client its connectet to a valid backend
+  // it responds with our specified response immediately after receiving every buffer
+  // this is sufficient into convincing the client its connected to a valid backend
   // if we respond with a readyForQuery message
   this.server = net.createServer(
     function (socket) {
@@ -40,14 +40,13 @@ Server.prototype.start = function (cb) {
     }.bind(this)
   )
 
-  port = port + 1
-
-  var options = {
-    host: 'localhost',
-    port: port,
-  }
-  this.server.listen(options.port, options.host, function () {
-    cb(options)
+  const host = 'localhost'
+  this.server.listen({ host, port: 0 }, () => {
+    const port = this.server.address().port
+    cb({
+      host,
+      port,
+    })
   })
 }
 
@@ -59,11 +58,11 @@ Server.prototype.close = function (cb) {
   this.server.close(cb)
 }
 
-var testServer = function (server, cb) {
+const testServer = function (server, cb) {
   // wait for our server to start
   server.start(function (options) {
     // connect a client to it
-    var client = new helper.Client(options)
+    const client = new helper.Client(options)
     client.connect().catch((err) => {
       assert(err instanceof Error)
       clearTimeout(timeoutId)
@@ -78,7 +77,7 @@ var testServer = function (server, cb) {
     })
 
     // blow up if we don't receive an error
-    var timeoutId = setTimeout(function () {
+    const timeoutId = setTimeout(function () {
       throw new Error('Client should have emitted an error but it did not.')
     }, 5000)
   })
